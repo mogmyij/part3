@@ -1,7 +1,30 @@
 const { response } = require("express");
 const express = require("express");
+const morgan = require("morgan");
 const app = express();
 app.use(express.json());
+app.use(
+  morgan("tiny", {
+    skip: (req, res) => {
+      return req.method === "POST";
+    },
+  })
+);
+
+morgan.token("POST-LOG", (req, res) => {
+  requestBodyString = JSON.stringify(req.body);
+  return requestBodyString;
+});
+app.use(
+  morgan(
+    ":method :url :status :res[content-length] - :response-time ms :POST-LOG ",
+    {
+      skip: (req, res) => {
+        return req.method !== "POST";
+      },
+    }
+  )
+);
 
 let phoneBook = [
   {
@@ -58,7 +81,7 @@ app.post("/api/persons", (request, response) => {
     });
   }
   var duplicateName = phoneBook.find((person) => person.name == newPerson.name);
-  if (duplicateName !== undefined ) {
+  if (duplicateName !== undefined) {
     return response.status(409).json({
       error: "contact already exists",
     });
