@@ -17,9 +17,10 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "server":"json-server -p3001 --watch db.json",
+    "server":"json-server -p3001 --watch db.json --routes routes.json",
     "build:ui": "rm -rf ../../build && npm run build && cp -r ./build ../../"
   },
+  "proxy": "http://localhost:3001",
   "eslintConfig": {
     "extends": [
       "react-app",

@@ -1,8 +1,12 @@
 const { response } = require("express");
 const express = require("express");
 const morgan = require("morgan");
+require("dotenv").config();
 const cors = require("cors");
+const Person = require("./models/person");
+const { isValidObjectId, default: mongoose } = require("mongoose");
 const app = express();
+
 app.use(cors());
 app.use(express.static("build"));
 app.use(express.json());
@@ -58,31 +62,47 @@ let phoneBook = [
 ];
 
 app.get("/api/persons", (request, response) => {
-  response.json(phoneBook);
+  //this returns a list of all entries of the database
+  Person.find({})
+    .then((persons) => {
+      response.json(persons);
+    })
+    .catch((err) => {
+      console.log("failed to get persons error:", err);
+    });
 });
 
 app.get("/api/persons/:id", (request, response) => {
-  const personId = parseInt(request.params.id);
-  var person = phoneBook.find((person) => person.id === personId);
-  if (person === undefined) {
-    return response.status(404).json({
-      error: "contact not found",
-    });
+  //checks if the ID is a valid objectID
+  const personId = request.params.id;
+  //sends error code 400 if invalid
+  if (!mongoose.isValidObjectId(personId)) {
+    console.log(personId, "is an invalid ID");
+    return response.status(400).json({ error: "invalid objectID" });
   }
-  response.json(person);
+  //finds person by ID provided
+  Person.findById(personId, (err, person) => {
+    if (err != undefined || person === null) {
+      console.log("failed to find person by ID error:", err);
+      return response.status(404).json({ error: "id not found" });
+    }
+    response.json(person);
+  });
 });
 
 app.get("/info", (request, response) => {
-  var size = phoneBook.length;
-  var dateTime = new Date();
-
-  response.write(`<p>There are ${size} contacts saved<p>`);
-  response.write(`${dateTime.toString()}`);
-  response.send();
+  Person.countDocuments({}, (err,size) => {
+    response.write(`<p>There are ${size} contacts saved<p>`);
+    var dateTime = new Date();
+    response.write(`${dateTime.toString()}`);
+    response.send();
+  });
 });
 
 app.post("/api/persons", (request, response) => {
+  //create new person object based on request
   var newPerson = request.body;
+  //if the name or number of the new object is empty throw an error
   if (newPerson.name === undefined || newPerson.number === undefined) {
     return response.status(422).json({
       error: "invalid contact information",
@@ -101,7 +121,12 @@ app.post("/api/persons", (request, response) => {
 });
 
 app.delete("/api/persons/:id", (request, response) => {
-  const personId = parseInt(request.params.id);
+  const personId= request.params.id
+  if (!mongoose.isValidObjectId(personId)) {
+    console.log(personId, "is an invalid person ID");
+    return response.status(400).json({error: "invalid objectID"})
+  }
+  //const personId = parseInt(request.params.id);
   var indexOfPersonToDelete = phoneBook.findIndex(
     (person) => person.id === personId
   );
