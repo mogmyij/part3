@@ -91,7 +91,7 @@ app.get("/api/persons/:id", (request, response) => {
 });
 
 app.get("/info", (request, response) => {
-  Person.countDocuments({}, (err,size) => {
+  Person.countDocuments({}, (err, size) => {
     response.write(`<p>There are ${size} contacts saved<p>`);
     var dateTime = new Date();
     response.write(`${dateTime.toString()}`);
@@ -108,35 +108,66 @@ app.post("/api/persons", (request, response) => {
       error: "invalid contact information",
     });
   }
-  var duplicateName = phoneBook.find((person) => person.name == newPerson.name);
-  if (duplicateName !== undefined) {
-    return response.status(409).json({
-      error: "contact already exists",
+  //check if person already exsits
+  Person.find({ name: newPerson.name }).then((person) => {
+    if (person.length > 0) {
+      return response.status(409).json({ error: "contact already exists" });
+    }
+
+    //add person if not a duplicate
+    const newDocument = new Person({
+      name: newPerson.name,
+      number: newPerson.number,
     });
+    newDocument.save().then((newDocument) => {
+      response.json(newDocument);
+    });
+  });
+});
+
+app.put("/api/persons/:id", (request, response) => {
+  const personId = request.params.id;
+  console.log("personID", personId);
+  //check if valid ID
+  if (!mongoose.isValidObjectId(personId)) {
+    console.log("invalid id: ", personId);
+    return response.status(400).json({ error: "invalid ID" });
   }
 
-  newPerson = { id: Math.floor(Math.random() * 10000), ...newPerson };
-  phoneBook.push(newPerson);
-  response.json(newPerson);
+  //check if person object had valid values
+  const updatedPerson = request.body;
+  if (updatedPerson.name === "" || updatedPerson.number === null) {
+    return response.status(409).json({ error: "invalid contact" });
+  }
+
+  console.log("new person", updatedPerson);
+
+  Person.findOneAndUpdate({ _id: personId }, updatedPerson, { new: true })
+    .then((person) => {
+      console.log("updated person:", person);
+      response.json(person);
+    })
+    .catch((err) => {
+      console.log("failed to update contact: ", err);
+    });
 });
 
 app.delete("/api/persons/:id", (request, response) => {
-  const personId= request.params.id
+  //make sure ID is a valid object ID
+  const personId = request.params.id;
   if (!mongoose.isValidObjectId(personId)) {
     console.log(personId, "is an invalid person ID");
-    return response.status(400).json({error: "invalid objectID"})
+    return response.status(400).json({ error: "invalid objectID" });
   }
-  //const personId = parseInt(request.params.id);
-  var indexOfPersonToDelete = phoneBook.findIndex(
-    (person) => person.id === personId
-  );
-  if (indexOfPersonToDelete === -1) {
-    return response.status(404).json({
-      error: "contact not found",
+
+  Person.deleteOne({ _id: personId })
+    .then((result) => {
+      response.sendStatus(200);
+    })
+    .catch((err) => {
+      console.log(`unable to delete person with ID of ${personId}`,err);
+      response.status(404).json({ error: "unable to delete contact" });
     });
-  }
-  phoneBook.splice(indexOfPersonToDelete, 1);
-  response.status(204).end();
 });
 
 const PORT = process.env.PORT || 3001;
